@@ -37,10 +37,7 @@ opam switch create 4.14.0
 eval $(opam env)
 
 # Install required packages
-opam install ounit2 ocaml-compiler-libs
-
-# Install ocamlfind to execute tests easily
-opam install ocamlfind
+opam install ounit2 ocaml-compiler-libs ocamlfind
 ```
 
 ## Compile and run:

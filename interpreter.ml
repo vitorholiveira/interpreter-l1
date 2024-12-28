@@ -98,7 +98,7 @@ let rec string_of_value = function
 let rec type_infer (env: type_env) (e: expr) : ty =
   let type_error msg = raise (TypeError msg) in
   match e with
-  (* T-Int  *)
+  (* T-Int *)
   | Num _ -> TyInt
   (* T-Bool *)
   | Bool _ -> TyBool
@@ -210,25 +210,8 @@ let rec type_infer (env: type_env) (e: expr) : ty =
 (*===============================================================================================================*)
 
 (*============*)
-(* EVALUATION *)
+(* Evaluation *)
 (*============*)
-
-(*Evaluation of binary operations *)
-let eval_binop op v1 v2 =
-  match (op, v1, v2) with
-  | (Add, VNum n1, VNum n2) -> VNum (n1 + n2)
-  | (Sub, VNum n1, VNum n2) -> VNum (n1 - n2)
-  | (Mult, VNum n1, VNum n2) -> VNum (n1 * n2)
-  | (Div, VNum n1, VNum n2) when n2 <> 0 -> VNum (n1 / n2)
-  | (Div, VNum _, VNum 0) -> raise (EvaluationError "Division by zero")
-  | (Eq, VNum n1, VNum n2) -> VBool (n1 = n2)
-  | (Lt, VNum n1, VNum n2) -> VBool (n1 < n2)
-  | (Gt, VNum n1, VNum n2) -> VBool (n1 > n2)
-  | (Geq, VNum n1, VNum n2) -> VBool (n1 >= n2)
-  | (Leq, VNum n1, VNum n2) -> VBool (n1 <= n2)
-  | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
-  | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
-  | _ -> raise (EvaluationError "Invalid operand types for binary operation")
 
 (* Expression evaluation *)
 let rec eval (env: runtime_env) (e: expr) : value =
@@ -238,7 +221,21 @@ let rec eval (env: runtime_env) (e: expr) : value =
   (* E-Bool *)
   | Bool b -> VBool b
   (* E-Binop *)
-  | Binop (op, e1, e2) -> eval_binop op (eval env e1) (eval env e2)
+  | Binop (op, e1, e2) -> 
+    (match (op, (eval env e1), (eval env e2)) with
+    | (Add, VNum n1, VNum n2) -> VNum (n1 + n2)
+    | (Sub, VNum n1, VNum n2) -> VNum (n1 - n2)
+    | (Mult, VNum n1, VNum n2) -> VNum (n1 * n2)
+    | (Div, VNum n1, VNum n2) when n2 <> 0 -> VNum (n1 / n2)
+    | (Div, VNum _, VNum 0) -> raise (EvaluationError "Division by zero")
+    | (Eq, VNum n1, VNum n2) -> VBool (n1 = n2)
+    | (Lt, VNum n1, VNum n2) -> VBool (n1 < n2)
+    | (Gt, VNum n1, VNum n2) -> VBool (n1 > n2)
+    | (Geq, VNum n1, VNum n2) -> VBool (n1 >= n2)
+    | (Leq, VNum n1, VNum n2) -> VBool (n1 <= n2)
+    | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
+    | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
+    | _ -> raise (EvaluationError "Invalid operand types for binary operation"))
   (* E-Var *)
   | Var x ->
       (match lookup_value env x with
@@ -282,13 +279,13 @@ let rec eval (env: runtime_env) (e: expr) : value =
       | VNil _ -> VBool true
       | VList _ -> VBool false
       | _ -> raise (EvaluationError "IsEmpty applied to non-list"))
-  (* E-Head*)
+  (* E-Head *)
   | Hd e ->
       (match eval env e with
       | VList (v, _) -> v
       | VNil _ -> raise (EvaluationError "Cannot take head of an empty list")
       | _ -> raise (EvaluationError "Head applied to non-list"))
-  (* E-Tail*)
+  (* E-Tail *)
   | Tl e ->
       (match eval env e with
       | VList (_, v) -> v
@@ -305,7 +302,7 @@ let rec eval (env: runtime_env) (e: expr) : value =
   | Nothing t -> VNothing t
   (* E-Just *)
   | Just e -> VJust (eval env e)
-  (* E-MatchMaybeNothing and E-MatchMaybeJust*)
+  (* E-MatchMaybeNothing and E-MatchMaybeJust *)
   | MatchMaybe (e, e1, x, e2) ->
       (match eval env e with
       | VNothing _ -> eval env e1
