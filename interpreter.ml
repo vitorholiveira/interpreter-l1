@@ -17,7 +17,7 @@ type ty =
 type ident = string
 
 (* Supported binary operations *)
-type op = 
+type op =
   | Add | Sub | Mult | Div     (* Arithmetic *)
   | Eq | Gt | Lt | Geq | Leq   (* Comparison *)
   | And | Or                   (* Logical binary operations *)
@@ -67,7 +67,7 @@ let lookup_type (env: type_env) (x: ident) : ty option =
 let lookup_value (env: runtime_env) (x: ident) : value option =
   List.assoc_opt x env
 
-let extend_env env key value = 
+let extend_env env key value =
   (key, value) :: env
 
 (* String conversion for types *)
@@ -153,7 +153,7 @@ let rec type_infer (env: type_env) (e: expr) : ty =
       (match type_infer env e2 with
       | TyList t2 when t1 = t2 -> TyList t1
       | _ -> type_error "Cons arguments type mismatch")
-  (* T-Empty *)
+  (* T-IsEmpty *)
   | IsEmpty e ->
       (match type_infer env e with
       | TyList _ -> TyBool
@@ -195,14 +195,17 @@ let rec type_infer (env: type_env) (e: expr) : ty =
     let t1 = type_infer env e1 in
     let t2 = type_infer env e2 in
     match oper with
+    (* T-BinopArith *)
     | Add | Sub | Mult | Div ->
         if t1 <> TyInt || t2 <> TyInt then
           type_error (Printf.sprintf "Arithmetic operation expects int arguments, got %s and %s" (string_of_type t1) (string_of_type t2));
         TyInt
+    (* T-BinopComp *)
     | Eq | Lt | Gt | Geq | Leq ->
         if t1 <> TyInt || t2 <> TyInt then
           type_error (Printf.sprintf "Comparison operation expects int arguments, got %s and %s" (string_of_type t1) (string_of_type t2));
         TyBool
+    (* T-BinopLogic *)
     | And | Or ->
         if t1 <> TyBool || t2 <> TyBool then
           type_error (Printf.sprintf "Logical operation expects bool arguments, got %s and %s" (string_of_type t1) (string_of_type t2));
@@ -220,22 +223,6 @@ let rec eval (env: runtime_env) (e: expr) : value =
   | Num n -> VNum n
   (* E-Bool *)
   | Bool b -> VBool b
-  (* E-Binop *)
-  | Binop (op, e1, e2) -> 
-    (match (op, (eval env e1), (eval env e2)) with
-    | (Add, VNum n1, VNum n2) -> VNum (n1 + n2)
-    | (Sub, VNum n1, VNum n2) -> VNum (n1 - n2)
-    | (Mult, VNum n1, VNum n2) -> VNum (n1 * n2)
-    | (Div, VNum n1, VNum n2) when n2 <> 0 -> VNum (n1 / n2)
-    | (Div, VNum _, VNum 0) -> raise (EvaluationError "Division by zero")
-    | (Eq, VNum n1, VNum n2) -> VBool (n1 = n2)
-    | (Lt, VNum n1, VNum n2) -> VBool (n1 < n2)
-    | (Gt, VNum n1, VNum n2) -> VBool (n1 > n2)
-    | (Geq, VNum n1, VNum n2) -> VBool (n1 >= n2)
-    | (Leq, VNum n1, VNum n2) -> VBool (n1 <= n2)
-    | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
-    | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
-    | _ -> raise (EvaluationError "Invalid operand types for binary operation"))
   (* E-Var *)
   | Var x ->
       (match lookup_value env x with
@@ -273,7 +260,7 @@ let rec eval (env: runtime_env) (e: expr) : value =
   | Nil t -> VNil t
   (* E-Cons *)
   | Cons (e1, e2) -> VList (eval env e1, eval env e2)
-  (* E-IsEmpty *)
+  (* E-IsEmptyNil and E-IsEmptyCons *)
   | IsEmpty e ->
       (match eval env e with
       | VNil _ -> VBool true
@@ -291,7 +278,7 @@ let rec eval (env: runtime_env) (e: expr) : value =
       | VList (_, v) -> v
       | VNil _ -> raise (EvaluationError "Cannot take tail of an empty list")
       | _ -> raise (EvaluationError "Tail applied to non-list"))
-  (* E-MatchListNil and E-MatchList *)
+  (* E-MatchListNil and E-MatchCons *)
   | MatchList (e, e1, x, xs, e2) ->
       (match eval env e with
       | VNil _ -> eval env e1
@@ -308,6 +295,26 @@ let rec eval (env: runtime_env) (e: expr) : value =
       | VNothing _ -> eval env e1
       | VJust v -> eval (extend_env env x v) e2
       | _ -> raise (EvaluationError "Match applied to non-maybe"))
+  (* E-Binop_ *)
+  | Binop (op, e1, e2) ->
+    (match (op, (eval env e1), (eval env e2)) with
+    (* E-BinopArith *)
+    | (Add, VNum n1, VNum n2) -> VNum (n1 + n2)
+    | (Sub, VNum n1, VNum n2) -> VNum (n1 - n2)
+    | (Mult, VNum n1, VNum n2) -> VNum (n1 * n2)
+    (* E-BinopZero *)
+    | (Div, VNum n1, VNum n2) when n2 <> 0 -> VNum (n1 / n2)
+    | (Div, VNum _, VNum 0) -> raise (EvaluationError "Division by zero")
+    (* E-BinopComp *)
+    | (Eq, VNum n1, VNum n2) -> VBool (n1 = n2)
+    | (Lt, VNum n1, VNum n2) -> VBool (n1 < n2)
+    | (Gt, VNum n1, VNum n2) -> VBool (n1 > n2)
+    | (Geq, VNum n1, VNum n2) -> VBool (n1 >= n2)
+    | (Leq, VNum n1, VNum n2) -> VBool (n1 <= n2)
+    (* E-Logic *)
+    | (And, VBool b1, VBool b2) -> VBool (b1 && b2)
+    | (Or, VBool b1, VBool b2) -> VBool (b1 || b2)
+    | _ -> raise (EvaluationError "Invalid operand types for binary operation"))
 
 (*===============================================================================================================*)
 
