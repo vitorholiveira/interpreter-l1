@@ -1,4 +1,4 @@
-# Interpreter and Type Inference for L1
+# Interpreter for L1
 
 This repository contains the implementation of an interpreter for the L1 language, which includes:
 
@@ -42,6 +42,7 @@ opam install ounit2 ocaml-compiler-libs ocamlfind
 
 ## Compile and run:
 ```bash
+eval $(opam env)
 ocamlfind ocamlc -package ounit2 -linkpkg -o tests interpreter.ml tests.ml
 ./tests
 ```
